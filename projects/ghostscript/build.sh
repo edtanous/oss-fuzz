@@ -16,37 +16,12 @@
 ################################################################################
 
 # Build CUPS
-pushd $SRC/cups
-# Fix bad line
-sed -i '2110s/\(\s\)f->value/\1(int)f->value/' cups/ppd-cache.c
-
-LSB_BUILD=y ./configure --prefix="$WORK" --libdir="$OUT" --disable-gnutls \
-   --disable-libusb --with-components=core
-
-make clean
-make install-headers install-libs
-make -C filter libs install-libs
-install -m755 cups-config "$WORK"/cups-config
-popd
-
-rm -rf cups/libs || die
-rm -rf freetype || die
-rm -rf zlib || die
-
-mv $SRC/freetype freetype
 
 CUPSCONFIG="$WORK/cups-config"
 CUPS_CFLAGS=$($CUPSCONFIG --cflags)
 CUPS_LDFLAGS=$($CUPSCONFIG --ldflags)
 CUPS_LIBS=$($CUPSCONFIG --image --libs)
 export CXXFLAGS="$CXXFLAGS $CUPS_CFLAGS"
-
-CPPFLAGS="${CPPFLAGS:-} $CUPS_CFLAGS -DPACIFY_VALGRIND" ./autogen.sh \
-  CUPSCONFIG=$CUPSCONFIG \
-  --enable-freetype --enable-fontconfig \
-  --enable-cups --with-ijs --with-jbig2dec \
-  --with-drivers=pdfwrite,cups,ljet4,laserjet,pxlmono,pxlcolor,pcl3,uniprint,pgmraw,ps2write,png16m,tiffsep1,faxg3,psdcmyk,eps2write,bmpmono,xpswrite
-make -j$(nproc) libgpdl
 
 fuzzers="gstoraster_fuzzer                \
          gstoraster_fuzzer_all_colors     \
@@ -64,12 +39,22 @@ fuzzers="gstoraster_fuzzer                \
          gs_device_xpswrite_fuzzer        \
          gs_device_pxlcolor_fuzzer        \
          gs_device_tiffsep1_fuzzer        \
-         gs_device_pdfwrite_opts_fuzzer   \
-         gs_pcl_fuzzer                    \
+         gs_device_pdfwrite_opts_fuzzer"
+
+for fuzzer in $fuzzers; do
+  $CXX $CXXFLAGS $CUPS_LDFLAGS -std=c++11 -I. -I$SRC \
+    $SRC/${fuzzer}.cc \
+    -o "$OUT/${fuzzer}" \
+    -Wl,-rpath='$ORIGIN' \
+    $CUPS_LIBS \
+    $LIB_FUZZING_ENGINE bin/gs.a
+done
+
+fuzzers2="gs_pcl_fuzzer                    \
          gs_pxl_fuzzer                    \
          gs_xps_fuzzer"
 
-for fuzzer in $fuzzers; do
+for fuzzer in $fuzzers2; do
   $CXX $CXXFLAGS $CUPS_LDFLAGS -std=c++11 -I. -I$SRC \
     $SRC/${fuzzer}.cc \
     -o "$OUT/${fuzzer}" \
