@@ -7,3 +7,5 @@ sanitizers:
 main_repo: 'https://github.com/openbmc/bmcweb.git'
 vendor_ccs:
 - david@adalogics.com
+primary_contact:
+- ed@tanous.net
